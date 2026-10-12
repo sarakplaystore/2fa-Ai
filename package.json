@@ -1,0 +1,21 @@
+{
+  "name": "still-authenticator",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build && node scripts/service-worker.js",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "node --test",
+    "test:ui": "node scripts/check-ui.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.0",
+    "qrcode": "^1.5.4",
+    "vite": "^7.1.0"
+  },
+  "dependencies": {
+    "jsqr": "^1.4.0"
+  }
+}
