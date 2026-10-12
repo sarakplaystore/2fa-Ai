@@ -1,0 +1,79 @@
+# Still — local-first authenticator.
+#
+#   docker compose up -d --build              # http://localhost:8080
+#   docker compose --profile tls up -d --build  # https://localhost (Caddy TLS)
+#
+# The app is static: no database, no volumes for secrets, nothing to migrate.
+# Your vault lives in the browser's local storage for the origin you visit, so
+# keep the scheme + host + port stable across redeploys and export an encrypted
+# backup before changing them.
+
+services:
+  still:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NODE_VERSION: "22"
+        PYTHON_VERSION: "3.13"
+    image: still-authenticator:local
+    container_name: still
+    restart: unless-stopped
+    init: true
+    # Published on loopback only: http://localhost:8080 is a secure context, so
+    # WebAuthn registration and unlock work. To expose the container directly on
+    # the network use "8080:8080" - but then the browser will refuse WebAuthn
+    # unless you terminate TLS in front of it (profile: tls below).
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8080"
+      DIST_DIR: /app/dist
+      # Enable only when the container is reached over real HTTPS:
+      # STILL_HSTS_MAX_AGE: "31536000"
+      # Restrict which Host headers are served (DNS-rebinding hardening):
+      # STILL_ALLOWED_HOSTS: "auth.example.com"
+      # Replace the header policy (it is added to the page's meta CSP):
+      # STILL_CSP: "frame-ancestors 'none'; base-uri 'self'; form-action 'none'"
+      # STILL_QUIET: "1"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "python", "/app/scripts/serve.py", "--healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # Optional HTTPS front end. Caddy issues a certificate automatically for a
+  # real domain, or a locally-trusted one for `localhost`.
+  caddy:
+    profiles: ["tls"]
+    image: caddy:2-alpine
+    container_name: still-caddy
+    restart: unless-stopped
+    depends_on:
+      - still
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # Set to your real domain for a public deployment, e.g.
+      # STILL_SITE_ADDRESS=auth.example.com
+      STILL_SITE_ADDRESS: ${STILL_SITE_ADDRESS:-localhost}
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  caddy_data:
+  caddy_config:

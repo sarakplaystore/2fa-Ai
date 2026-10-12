@@ -1,0 +1,30 @@
+{$STILL_SITE_ADDRESS:localhost} {
+	# Compress the text assets (HTML, CSS, JS, SVG). The Python server sends
+	# uncompressed bytes; doing it here keeps the runtime dependency-free.
+	encode zstd gzip
+
+	# Strip the upstream server banner and pin framing/referrer policy at the
+	# edge. The rest of the app's security headers come from serve.py and from
+	# the CSP meta tag in index.html.
+	header {
+		-Server
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		X-Content-Type-Options "nosniff"
+	}
+
+	# HSTS only for a real domain: browsers ignore it on localhost, and setting
+	# it on an origin you might later serve over plain HTTP is hard to undo.
+	@edge not host localhost 127.0.0.1
+	header @edge Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+	# The container's static server. No path prefix rewriting: the app must be
+	# served from the origin root, or local storage and the service worker scope
+	# break.
+	reverse_proxy still:8080
+
+	log {
+		output stderr
+		format console
+	}
+}

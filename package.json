@@ -3,12 +3,23 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build && node scripts/service-worker.js",
     "preview": "vite preview --host 0.0.0.0",
+    "serve": "python3 scripts/serve.py --host 127.0.0.1 --port 4173 --dir dist",
+    "serve:lan": "python3 scripts/serve.py --host 0.0.0.0 --port 4173 --dir dist",
     "test": "node --test",
-    "test:ui": "node scripts/check-ui.mjs"
+    "test:ui": "node scripts/check-ui.mjs",
+    "docker:build": "docker build -t still-authenticator:local .",
+    "docker:run": "docker run --rm --init -p 127.0.0.1:8080:8080 still-authenticator:local",
+    "docker:up": "docker compose up -d --build",
+    "docker:https": "docker compose --profile tls up -d --build",
+    "docker:logs": "docker compose logs -f still",
+    "docker:down": "docker compose down"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",
