@@ -1,0 +1,42 @@
+# Build context for `docker build`. Keep it small and reproducible: the image
+# must contain the compiled app, never local state or secrets.
+.git
+.gitignore
+.github
+.arena
+node_modules
+dist
+test-results
+playwright-report
+coverage
+
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.env
+.env.*
+!.env.example
+
+# Local tooling caches
+.mypy_cache
+.pytest_cache
+.ruff_cache
+__pycache__
+*.pyc
+.venv
+venv
+
+# Docker artifacts themselves
+Dockerfile
+.dockerignore
+docker-compose.yml
+compose.yaml
+compose.yml
+deploy/caddy/data
+deploy/caddy/config
+
+# Editor
+.vscode
+.idea
+*.swp

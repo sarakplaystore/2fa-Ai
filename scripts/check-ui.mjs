@@ -1,4 +1,6 @@
 // Run against `npm run preview -- --port 4173`.
+// Point it at any production build with UI_BASE_URL, e.g. the Docker image or
+// scripts/serve.py: `UI_BASE_URL=http://localhost:8080 npm run test:ui`.
 // Uses a mocked PRF credential, not a real biometric device.
 // Default: install Chromium with `npx playwright install chromium`.
 // Optional packaged Chromium: npm install --no-save @sparticuz/chromium
@@ -10,6 +12,10 @@ const chromium = process.env.USE_PACKAGED_CHROMIUM
 import assert from "node:assert/strict";
 import QRCode from "qrcode";
 import { readFile } from "node:fs/promises";
+// The origin the smoke test drives. WebAuthn and the vault are origin-bound, so
+// this must be a secure context (localhost or HTTPS) - the same rule a real
+// deployment follows.
+const baseUrl = process.env.UI_BASE_URL || "http://localhost:4173";
 const browser = await playwright.launch(
   chromium
     ? {
@@ -41,7 +47,7 @@ await page.addInitScript(() => {
     value: async () => credential,
   });
 });
-await page.goto("http://localhost:4173");
+await page.goto(baseUrl);
 
 await page.getByRole("button", { name: "Set up your private vault" }).click();
 await page
