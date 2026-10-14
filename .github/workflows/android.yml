@@ -33,8 +33,12 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
-      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      # ubuntu-latest already includes this SDK; avoid downloading command-line
+      # tools again just to build an offline app.
+      - name: Check installed Android SDK
+        run: |
+          test -f "$ANDROID_HOME/platforms/android-35/android.jar"
+          test -x "$ANDROID_HOME/build-tools/35.0.0/aapt2"
       - run: ./gradlew --no-daemon :app:assembleDebug
         working-directory: android
       - uses: actions/upload-artifact@v4
