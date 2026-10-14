@@ -22,6 +22,25 @@ To check the offline behaviour after a build, load the app once in the preview, 
 
 The first hosted visit downloads the app. The production service worker caches only static assets for later offline use. It does not cache vaults or export files. No service worker is installed during development. To avoid internet access altogether during use, install dependencies/build in advance, run the production app on localhost, and disconnect from the internet. Your browser or operating system may independently make requests; this app cannot control that.
 
+## Android APK (offline)
+
+An **Android 11+** project is in `android/`. Unlike a URL shortcut, its APK includes the built web UI and QR decoder; it does not need a server or a first online visit. It asks for **no INTERNET, camera, or storage permission**. The app serves only bundled files from a synthetic HTTPS origin, blocks other URLs, disables WebView debugging/screenshots/backups, and uses the system document picker for QR images/imports and password-encrypted backup exports.
+
+The website's WebAuthn PRF credential cannot be used inside an Android WebView. The APK instead generates a random device secret, wraps it with an **Android Keystore AES-GCM key requiring a strong biometric or device PIN for every unlock**, and derives the vault's AES key with HKDF. There is no plaintext/password-only fallback. The APK's local vault is separate from any website/PWA vault. To transfer accounts, export a password-encrypted backup from one and import it into the other; copying browser storage or installing the APK will **not** migrate a vault. Clearing app data, removing the screen lock, or uninstalling can make the APK vault inaccessible; save an encrypted backup elsewhere first.
+
+To build a **debug APK**, install Node.js 22+, JDK 17, Android SDK platform 35 and build-tools 35.0.0, then:
+
+```sh
+npm ci
+npm test
+npm run build:android
+cd android
+./gradlew :app:assembleDebug
+# android/app/build/outputs/apk/debug/app-debug.apk (relative to the repo root)
+```
+
+The [Android debug APK workflow](.github/workflows/android.yml) also builds and uploads the APK as a GitHub Actions artifact on pushes. A debug APK is signed with a **development key**, not a production signing key; do not assume builds from different machines can update one another. For distribution, build/sign a release APK with your own securely stored release key outside this repository and test installation, device authentication, QR import, and backup restore on actual Android hardware. This experimental authenticator has **not** been independently audited or physically device-tested here; keep recovery codes and another trusted authenticator for important accounts. No signing key or plaintext account data belongs in Git.
+
 ## Offline use
 
 This is an installable web app (PWA). The first visit needs a connection; after that the app runs from its own cache:
