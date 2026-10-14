@@ -206,7 +206,8 @@ test("the generated service worker invalidates its cache on every new build", ()
   const first = build("<!doctype html><p>one</p>");
   const second = build("<!doctype html><p>two</p>");
   assert.match(first, /"\/assets\/index-a\.js"/);
-  const cacheName = (sw) => /const CACHE='([^']+)'/.exec(sw)?.[1];
+  const cacheName = (sw) => /const CACHE = "([^"]+)"/.exec(sw)?.[1];
+  assert.match(cacheName(first), /^still-/, "the cache must be named for the build");
   assert.equal(cacheName(first), cacheName(build("<!doctype html><p>one</p>")));
   assert.notEqual(
     cacheName(first),
@@ -231,6 +232,8 @@ test(".vercelignore hides nothing the deployment needs", () => {
       "vite.config.js",
       "src/main.js",
       "public/favicon.svg",
+      "public/manifest.webmanifest",
+      "public/icons/icon-512.png",
       "scripts/service-worker.js",
     ])
       assert.ok(

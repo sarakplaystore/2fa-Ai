@@ -52,14 +52,74 @@ let vault = null,
   search = "",
   revealed = new Set(),
   idleTimer,
-  codeEpoch = 0;
+  codeEpoch = 0,
+  offlineReady = !!navigator.serviceWorker?.controller,
+  offlineAnnounced = false,
+  installPrompt = null;
 try {
   vault = JSON.parse(localStorage.getItem(STORAGE) || "null");
 } catch {}
 const unlocked = () => !!key;
 const app = document.querySelector("#app");
+// Offline support. The production build registers a service worker that caches
+// this app's own files once per deployment, so the shell, the vault and the
+// import/export dialogs keep working with no connection. Nothing about the
+// vault or its codes is ever cached; see scripts/service-worker.js.
+const swSupported = () =>
+  "serviceWorker" in navigator && window.isSecureContext;
+const installed = () =>
+  window.matchMedia?.("(display-mode: standalone)").matches ||
+  window.navigator.standalone === true;
+function offlineStatus() {
+  if (import.meta.env.DEV) return "Not cached in development builds";
+  if (!("serviceWorker" in navigator)) return "Unavailable in this browser";
+  if (!window.isSecureContext) return "Needs HTTPS or localhost";
+  return offlineReady
+    ? "Ready — cached on this device"
+    : "Preparing the offline copy…";
+}
+function pill() {
+  const online = navigator.onLine;
+  return `<span class="local-pill${online ? "" : " offline"}" title="${
+    online
+      ? "Nothing is sent to a server"
+      : "Offline — your codes, imports and backups still work"
+  }"><i class="pill-dot"></i><span class="pill-label">${
+    online ? "Local only" : "Offline — codes still work"
+  }</span></span>`;
+}
+function installControl() {
+  if (installed())
+    return `<span class="setting-value">${icon("check")} Installed</span>`;
+  if (installPrompt)
+    return `<button class="button secondary" data-action="install">${icon("arrow")} Install Still</button>`;
+  return `<span class="setting-value">Use your browser’s install or “Add to Home Screen” option</span>`;
+}
+// Repaints what depends on the connection or on offline readiness. An open
+// dialog is never wiped, so the header pill is updated in place instead.
+function paintStatus() {
+  const badge = document.querySelector(".local-pill"),
+    label = badge?.querySelector(".pill-label"),
+    online = navigator.onLine;
+  if (badge && label) {
+    badge.classList.toggle("offline", !online);
+    badge.title = online
+      ? "Nothing is sent to a server"
+      : "Offline — your codes, imports and backups still work";
+    label.textContent = online ? "Local only" : "Offline — codes still work";
+  }
+  if (page === "settings" && !document.querySelector("#modal")?.open) render();
+}
+function installApp() {
+  const prompt = installPrompt;
+  installPrompt = null;
+  if (!prompt) return;
+  prompt.prompt();
+  Promise.resolve(prompt.userChoice).catch(() => {});
+  paintStatus();
+}
 function render() {
-  app.innerHTML = `<aside class="sidebar"><a class="brand" href="#" aria-label="Still home"><span class="brand-mark"><i></i><i></i><i></i></span>still<span class="brand-dot">.</span></a><div class="workspace"><span class="workspace-icon">${icon("lock")}</span><div>Personal vault<small>ON THIS DEVICE</small></div><span class="status-dot"></span></div><div class="nav-label">WORKSPACE</div><nav><button data-page="accounts" class="${page === "accounts" ? "active" : ""}">${icon("grid")}Authenticator<span class="nav-count">${unlocked() ? accounts.length : "—"}</span></button><button data-action="import">${icon("arrow")}Import accounts</button><button data-action="export">${icon("export")}Export backup</button><div class="nav-divider"></div><button data-page="security" class="${page === "security" ? "active" : ""}">${icon("shield")}Security & privacy</button><button data-page="settings" class="${page === "settings" ? "active" : ""}">${icon("gear")}Settings</button></nav><div class="sidebar-bottom"><div class="local-note"><span class="local-icon">${icon("offline")}</span><strong>Offline. By design.</strong><p>No accounts. No cloud.<br>Just you and your keys.</p><button data-page="security">Our privacy promise ${icon("chevron")}</button></div><div class="version"><span class="tiny-mark">|||</span> STILL AUTHENTICATOR <span>v1.0</span></div></div></aside><div class="shell"><header><div class="breadcrumb">Personal vault ${icon("chevron")} <span>${page === "accounts" ? "Authenticator" : page === "security" ? "Security & privacy" : "Settings"}</span></div><div class="header-right"><span class="local-pill"><span></span> Local only</span><button class="lock-button" data-action="${unlocked() ? "lock" : "unlock"}">${icon("lock")} ${unlocked() ? "Lock vault" : "Vault locked"}</button><span class="avatar">${icon("shield")}</span></div></header><main>${page === "accounts" ? accountsPage() : page === "security" ? securityPage() : settingsPage()}</main><footer><span>${icon("shield")} Your secrets never leave this device unless you export them.</span><span>Made for peace of mind <span class="footer-dot">✦</span></span></footer></div><div id="toast" role="status"></div><dialog id="modal"></dialog>`;
+  app.innerHTML = `<aside class="sidebar"><a class="brand" href="#" aria-label="Still home"><span class="brand-mark"><i></i><i></i><i></i></span>still<span class="brand-dot">.</span></a><div class="workspace"><span class="workspace-icon">${icon("lock")}</span><div>Personal vault<small>ON THIS DEVICE</small></div><span class="status-dot"></span></div><div class="nav-label">WORKSPACE</div><nav><button data-page="accounts" class="${page === "accounts" ? "active" : ""}">${icon("grid")}Authenticator<span class="nav-count">${unlocked() ? accounts.length : "—"}</span></button><button data-action="import">${icon("arrow")}Import accounts</button><button data-action="export">${icon("export")}Export backup</button><div class="nav-divider"></div><button data-page="security" class="${page === "security" ? "active" : ""}">${icon("shield")}Security & privacy</button><button data-page="settings" class="${page === "settings" ? "active" : ""}">${icon("gear")}Settings</button></nav><div class="sidebar-bottom"><div class="local-note"><span class="local-icon">${icon("offline")}</span><strong>Offline. By design.</strong><p>No accounts. No cloud.<br>Just you and your keys.</p><button data-page="security">Our privacy promise ${icon("chevron")}</button></div><div class="version"><span class="tiny-mark">|||</span> STILL AUTHENTICATOR <span>v1.0</span></div></div></aside><div class="shell"><header><div class="breadcrumb">Personal vault ${icon("chevron")} <span>${page === "accounts" ? "Authenticator" : page === "security" ? "Security & privacy" : "Settings"}</span></div><div class="header-right">${pill()}<button class="lock-button" data-action="${unlocked() ? "lock" : "unlock"}">${icon("lock")} ${unlocked() ? "Lock vault" : "Vault locked"}</button><span class="avatar">${icon("shield")}</span></div></header><main>${page === "accounts" ? accountsPage() : page === "security" ? securityPage() : settingsPage()}</main><footer><span>${icon("shield")} Your secrets never leave this device unless you export them.</span><span>Made for peace of mind <span class="footer-dot">✦</span></span></footer></div><div id="toast" role="status"></div><dialog id="modal"></dialog>`;
   bind();
   if (unlocked()) updateCodes();
 }
@@ -91,7 +151,7 @@ function securityPage() {
     [
       "offline",
       "No application network requests",
-      "No analytics, remote APIs, external fonts, or cloud account. Production assets are cached for offline use after the first visit. Opening this hosted site initially still requires a network connection.",
+      "No analytics, remote APIs, external fonts, or cloud account. After the first visit the app caches its own files, so Still opens and unlocks offline. Codes, imports and backups keep working with no connection; only the first visit needs one.",
     ],
     [
       "eye",
@@ -116,7 +176,7 @@ function securityPage() {
     .join("")}</div>`;
 }
 function settingsPage() {
-  return `<div class="page-heading"><div><div class="eyebrow">YOUR SPACE, YOUR RULES</div><h1>Vault settings</h1><p>Simple defaults. Strong protection.</p></div></div><section class="settings-card"><h3>Privacy defaults</h3><div class="setting-row"><div><strong>Hide verification codes</strong><p>Reveal individual codes only when you need them.</p></div><span class="setting-value">Always on ${icon("check")}</span></div><div class="setting-row"><div><strong>Lock when you leave</strong><p>Moving to another tab or window locks your vault.</p></div><span class="setting-value">Always on ${icon("check")}</span></div><div class="setting-row"><div><strong>Inactivity lock</strong><p>Automatically clear the unlocked vault from memory.</p></div><span class="setting-value">2 minutes</span></div><div class="setting-row"><div><strong>Encrypted backup</strong><p>Back up before clearing browser data or moving devices.</p></div><button class="button secondary" data-action="export">${icon("export")} Export</button></div></section><section class="settings-card danger-zone"><h3>Delete local vault</h3><p>This permanently removes this browser’s encrypted vault. Your device credential is managed separately in your device settings.</p><button class="button danger" data-action="reset">Delete vault from this browser</button></section>`;
+  return `<div class="page-heading"><div><div class="eyebrow">YOUR SPACE, YOUR RULES</div><h1>Vault settings</h1><p>Simple defaults. Strong protection.</p></div></div><section class="settings-card"><h3>Privacy defaults</h3><div class="setting-row"><div><strong>Hide verification codes</strong><p>Reveal individual codes only when you need them.</p></div><span class="setting-value">Always on ${icon("check")}</span></div><div class="setting-row"><div><strong>Lock when you leave</strong><p>Moving to another tab or window locks your vault.</p></div><span class="setting-value">Always on ${icon("check")}</span></div><div class="setting-row"><div><strong>Inactivity lock</strong><p>Automatically clear the unlocked vault from memory.</p></div><span class="setting-value">2 minutes</span></div><div class="setting-row"><div><strong>Encrypted backup</strong><p>Back up before clearing browser data or moving devices.</p></div><button class="button secondary" data-action="export">${icon("export")} Export</button></div></section><section class="settings-card offline-card"><h3>Offline &amp; install</h3><div class="setting-row"><div><strong>Offline access</strong><p>After the first visit the app caches its own files, so Still opens, unlocks and shows your codes with no connection. Your vault, codes, and exported files are never cached.</p></div><span class="setting-value" data-offline-status>${offlineStatus()}</span></div><div class="setting-row"><div><strong>Connection</strong><p>${navigator.onLine ? "Online, but nothing is sent anywhere. Your vault never leaves this device." : "You are offline. Codes, imports and encrypted backups all still work."}</p></div><span class="setting-value" data-network-status>${navigator.onLine ? "Online" : "Offline"}</span></div><div class="setting-row"><div><strong>Install to this device</strong><p>Add Still to your home screen or desktop so it opens like an app — no address bar, and usable offline.</p></div>${installControl()}</div></section><section class="settings-card danger-zone"><h3>Delete local vault</h3><p>This permanently removes this browser’s encrypted vault. Your device credential is managed separately in your device settings.</p><button class="button danger" data-action="reset">Delete vault from this browser</button></section>`;
 }
 function bind() {
   document.querySelectorAll("[data-page]").forEach(
@@ -204,6 +264,7 @@ function action(a) {
     toast("All verification codes are hidden.");
     return;
   }
+  if (a === "install") return installApp();
   if (!unlocked()) return unlockDialog(a);
   if (a === "add") addDialog();
   if (a === "import") importDialog();
@@ -596,5 +657,40 @@ window.addEventListener("storage", (e) => {
 });
 setInterval(() => updateCodes().catch(() => lock()), 1000);
 render();
-if (import.meta.env.PROD && "serviceWorker" in navigator)
-  navigator.serviceWorker.register("/sw.js").catch(() => {});
+// Offline. The service worker caches this app's own files once per deployment,
+// which is what makes opening, unlocking and exporting possible with no
+// connection. If it cannot be registered, the settings page says so instead of
+// promising offline access that is not there.
+window.addEventListener("offline", () => {
+  paintStatus();
+  toast("You’re offline. Your codes, imports and backups still work.");
+});
+window.addEventListener("online", paintStatus);
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  installPrompt = event;
+  paintStatus();
+});
+window.addEventListener("appinstalled", () => {
+  installPrompt = null;
+  paintStatus();
+  toast("Still was installed. It opens offline from now on.");
+});
+if (import.meta.env.PROD && swSupported()) {
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    offlineReady = true;
+    paintStatus();
+  });
+  navigator.serviceWorker
+    .register("/sw.js")
+    .then(() => navigator.serviceWorker.ready)
+    .then(() => {
+      if (!offlineReady && !offlineAnnounced) {
+        offlineAnnounced = true;
+        toast("Still is cached on this device. It works offline now.");
+      }
+      offlineReady = true;
+      paintStatus();
+    })
+    .catch(() => {});
+}

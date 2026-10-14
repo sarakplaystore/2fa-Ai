@@ -8,6 +8,7 @@
     "build": "vite build && node scripts/service-worker.js",
     "preview": "vite preview --host 0.0.0.0",
     "preview:vercel": "node scripts/vercel-preview.mjs",
+    "icons": "node scripts/icons.mjs",
     "test": "node --test",
     "test:ui": "node scripts/check-ui.mjs"
   },

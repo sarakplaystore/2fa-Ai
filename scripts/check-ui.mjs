@@ -166,8 +166,68 @@ await page
   .waitFor();
 assert.equal(await page.locator("#import-text").inputValue(), "");
 await page.keyboard.press("Escape");
+// Installed-app support: the manifest is served and parsed by the browser, and
+// the offline copy holds the app's own files — no vault, code or export data.
+const metadata = await page.evaluate(async () => {
+  const manifest = await fetch("/manifest.webmanifest").then((r) => r.json());
+  const names = await caches.keys();
+  const cache = await caches.open(names.find((n) => n.startsWith("still-")));
+  return {
+    name: manifest.name,
+    display: manifest.display,
+    start: manifest.start_url,
+    icons: manifest.icons.length,
+    cached: (await cache.keys()).map((request) => new URL(request.url).pathname),
+    controlled: !!navigator.serviceWorker.controller,
+  };
+});
+assert.ok(metadata.controlled, "the offline service worker should be controlling");
+assert.equal(metadata.display, "standalone");
+assert.equal(metadata.start, "/");
+assert.equal(metadata.icons, 4);
+for (const file of [
+  "/",
+  "/index.html",
+  "/manifest.webmanifest",
+  "/favicon.svg",
+  "/icons/icon-192.png",
+  "/icons/icon-maskable-512.png",
+])
+  assert.ok(metadata.cached.includes(file), `${file} is not available offline`);
+assert.ok(
+  metadata.cached.some((path) => path.includes("qr-worker")),
+  "the QR decoder must work offline too",
+);
+assert.ok(
+  !metadata.cached.some((path) => /backup|vault|export|\.json$/i.test(path)),
+  "the offline copy must not hold vault or export data",
+);
+// A deep link is not a cached URL: the worker has to answer with the app shell
+// instead of the browser's offline error page.
+await page.goto("http://localhost:4173/accounts/example");
+await page
+  .getByRole("heading", { name: "Your authenticator", exact: true })
+  .waitFor();
+await page.context().setOffline(false);
+// Back online at the same narrow width, the settings page confirms the offline
+// copy is ready and the new install/offline rows still fit.
+await page.getByRole("button", { name: "Settings", exact: true }).click();
+await page
+  .getByText("Ready — cached on this device", { exact: true })
+  .waitFor();
+await page
+  .getByText("Use your browser’s install or “Add to Home Screen” option", {
+    exact: true,
+  })
+  .or(page.getByRole("button", { name: "Install Still" }))
+  .waitFor();
+assert.ok(
+  await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+  "the settings page must not overflow on mobile",
+);
+await page.getByRole("button", { name: "Authenticator", exact: false }).click();
 assert.deepEqual(errors, []);
 console.log(
-  "UI smoke passed: setup (mocked credential), add, reveal, search, encrypted backup restore/wrong-password rejection, lock/unlock, import, Escape lock, navigation, responsive layout, offline reload, offline QR decoding and unrelated-QR rejection.",
+  "UI smoke passed: setup (mocked credential), add, reveal, search, encrypted backup restore/wrong-password rejection, lock/unlock, import, Escape lock, navigation, responsive layout, offline reload, offline QR decoding, unrelated-QR rejection, installable manifest, offline cache contents and offline deep links.",
 );
 await browser.close();
