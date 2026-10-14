@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   debug-apk:
@@ -41,15 +41,6 @@ jobs:
           test -x "$ANDROID_HOME/build-tools/35.0.0/aapt2"
       - run: ./gradlew --no-daemon :app:assembleDebug
         working-directory: android
-      # One-off transfer to the session branch; remove after the binary arrives.
-      - name: Put requested APK on the session branch
-        if: github.ref == 'refs/heads/arena/532457b0-2fa-ai'
-        run: |
-          mkdir -p apk
-          cp android/app/build/outputs/apk/debug/app-debug.apk apk/StillAuthenticator-debug.apk
-          git add -f apk/StillAuthenticator-debug.apk
-          git -c user.name='Arena Build' -c user.email='build@users.noreply.github.com' commit -m 'Update installable Still Android debug APK'
-          git push origin HEAD:arena/532457b0-2fa-ai
       - uses: actions/upload-artifact@v4
         with:
           name: still-authenticator-debug-apk
