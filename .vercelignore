@@ -1,0 +1,3 @@
+# Not part of the production build or of the deployed site.
+test/
+scripts/check-ui.mjs
