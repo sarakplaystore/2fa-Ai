@@ -1,6 +1,6 @@
 # Still — local-first authenticator
 
-A responsive, private TOTP authenticator. No backend, analytics, remote fonts, account registration service, or application API calls. Account secrets are encrypted in this browser's local storage.
+A responsive, private TOTP authenticator that keeps working offline. No backend, analytics, remote fonts, account registration service, or application API calls. Account secrets are encrypted in this browser's local storage.
 
 ## Run
 
@@ -18,7 +18,27 @@ npm run preview -- --port 4173
 
 Open `http://localhost:4173` locally or deploy `dist/` to a **trusted HTTPS origin** (see [Deploy on Vercel](#deploy-on-vercel)). The preview server is bound to all interfaces for Arena previews; for strictly local use, run `npm run preview -- --host 127.0.0.1 --port 4173` instead. Keep the address, hostname, and port unchanged: both local storage and credentials depend on the origin. Do not use the Vite development server for real secrets.
 
+To check the offline behaviour after a build, load the app once in the preview, then reload it with the network switched off: the app, its codes and its dialogs keep working, and the header pill says so (see [Offline use](#offline-use)).
+
 The first hosted visit downloads the app. The production service worker caches only static assets for later offline use. It does not cache vaults or export files. No service worker is installed during development. To avoid internet access altogether during use, install dependencies/build in advance, run the production app on localhost, and disconnect from the internet. Your browser or operating system may independently make requests; this app cannot control that.
+
+## Offline use
+
+This is an installable web app (PWA). The first visit needs a connection; after that the app runs from its own cache:
+
+- **Opening the app** — reload, relaunch, a bookmark, or a deep link such as `/accounts/example` all render the app shell offline instead of the browser's error page.
+- **Everything in the vault** — unlocking with your device credential, viewing and copying codes, adding, searching and removing accounts, importing, and exporting encrypted backups. None of it touches the network.
+- **Nothing else is cached.** The offline copy is a fixed list of this app's own build files. It contains no vault data, no codes, no exports, and no import files, and the service worker has no runtime cache write: what it can serve offline is decided at build time in `scripts/service-worker.js`.
+- **The page says where it stands.** The header pill reads *Local only* or *Offline — codes still work*, and **Settings → Offline & install** reports the state of the offline copy.
+
+Install it from the browser's install control or *Add to Home Screen*; it then opens in its own window with no address bar. The install button in Settings appears when the browser offers a prompt (Chromium-based browsers); iOS and Firefox install from the browser's own share or app menu, and the settings row says so. Installing is optional — the offline copy works in an ordinary tab too — and it does not change which origin your vault belongs to.
+
+Worth knowing:
+
+- The service worker only runs in a production build (`npm run build`), never in `npm run dev`, so development cannot leave a cached copy behind. To test offline behaviour, build, run `npm run preview`, load the page once, and then reload with the network disabled.
+- The offline copy is replaced on the next visit after a new deployment: `/sw.js` and `/manifest.webmanifest` are always revalidated, and the new worker adopts the page and deletes the previous cache. Only one build is ever cached, so a page left open across a deployment keeps running until you reload it.
+- An installed app is still bound to its origin, like everything else here. Installing from a preview URL does not move the vault to your production domain.
+- Everything tied to your device credential still applies offline: no credential, no plaintext fallback. Connection state never weakens vault protection.
 
 ## Deploy on Vercel
 
@@ -30,7 +50,7 @@ The repository deploys as-is: no backend, no serverless functions, no environmen
 
 - **Build**: framework `vite`, install `npm ci`, build `npm run build`, output `dist`. Node.js comes from `engines.node` (`>=22.12`, so Vercel picks its newest supported LTS, currently 24.x).
 - **Security headers** on every response: `Content-Security-Policy` (the page's `<meta>` policy plus `frame-ancestors 'none'`, which a meta tag cannot express), `Strict-Transport-Security`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Cross-Origin-Opener-Policy` and `Cross-Origin-Resource-Policy: same-origin`, `Permissions-Policy` (camera, microphone, geolocation, USB and the rest denied; WebAuthn allowed for this origin only) and `X-Robots-Tag: noindex`. They apply to custom domains too.
-- **Caching**: hashed files under `/assets/` are `immutable` for a year; `/`, `/index.html` and `/sw.js` are always revalidated, so a new deployment reaches the browser on the next visit. The generated service worker names its cache after the build and deletes older caches, and `public/robots.txt` keeps the app out of search indexes.
+- **Caching**: hashed files under `/assets/` are `immutable` for a year; `/`, `/index.html`, `/sw.js` and `/manifest.webmanifest` are always revalidated, so a new deployment reaches the browser on the next visit; the unhashed icons get a day. The generated service worker names its cache after the build and deletes older caches, and `public/robots.txt` keeps the app out of search indexes.
 - **Routing**: one catch-all rewrite to `/index.html`, excluding Vercel's reserved `/_vercel/*` namespace. Unknown paths return the app shell instead of a 404.
 
 Origin rules matter more here than on a normal site:
@@ -66,6 +86,7 @@ curl -sSI https://your-app.vercel.app | grep -iE 'content-security|strict-transp
 - Import `otpauth://totp` links, JSON account arrays/envelopes, Still encrypted backups, and single-batch Google Authenticator `otpauth-migration` links.
 - Portable local QR-image decoding using a bundled jsQR worker; no browser `BarcodeDetector` dependency, external decoder service, or live camera requirement. The worker is cached for offline use and stopped on dialog close. PNG, JPEG, and WebP files up to 5 MB are supported; use one clear QR code per image.
 - Complete encrypted backups containing all secret keys and TOTP settings, protected by a separate password with PBKDF2-SHA256 (600,000 iterations) and AES-256-GCM.
+- Installable, offline-first build: a web app manifest with regular and maskable icons, a service worker that caches the app's own files once per deployment, offline app-shell routing for deep links, and a live connection/offline indicator in the header and in Settings.
 - Mobile-responsive interface, keyboard-accessible dialogs, security explanations, and destructive-action confirmations.
 
 ## Device login requirements
@@ -102,6 +123,7 @@ This example is a public demonstration key: **never use it for a real service**.
 - Encrypted backups require their password. Store them offline with a strong unique password, kept separately.
 - A compromised device, malicious extension, injected script, malicious future deployment, or someone able to use your device PIN can defeat these protections. A trusted hosting origin and browser are essential.
 - Copying a code leaves it on the system clipboard; clipboard contents are not automatically erased. Codes may remain usable through their current TOTP interval even after vault locking.
+- The offline copy is a fixed list of this app's own build files, decided when the build runs; nothing else can enter it at runtime. It is replaced when the next deployment is visited, and an installed app is served by that same cache. Vault data, codes and exports are never part of it.
 - JavaScript cannot guarantee forensic zeroization of memory. Locking drops live references and removes secrets/codes from the UI, not from every possible memory snapshot.
 - Browser storage contains only encrypted account data plus credential ID/salt/version/IV metadata. The AES key is nonextractable and not persisted. Vault storage size/account count may still be observable.
 - No software can guarantee protection against mind reading. The privacy controls here address physical observation and unauthorized digital access.
@@ -117,6 +139,8 @@ npm run build
 
 Tests cover all RFC 6238 SHA-1/SHA-256/SHA-512 vectors, Base32 validation, import parsing, Google migration parsing, encryption integrity, password backup round trips, malformed encrypted payloads, import limits, and a 1,000-account encryption round trip. The deployment is covered too: the `vercel.json` build wiring against `package.json` and the Vite config, the SPA fallback and its `/_vercel/*` exclusion, the served header set against the page's CSP, cache policy per path, and the service worker's cache invalidation on a new build.
 
+`test/offline.test.js` covers offline. It reads the manifest, checks the committed icons against the generator (size, opacity and pixels), then loads the generated `dist/sw.js` into a small service-worker harness with real `caches` and `fetch` and drives install, activate and fetch: the whole app shell is precached, a new build replaces the old cache and leaves other caches alone, cached files and navigations — including deep links — are answered with no connection, uncached requests fall through to the network without ever being stored, and non-GET and cross-origin requests are left untouched.
+
 Optional browser smoke test (start the production preview first):
 
 ```sh
@@ -124,8 +148,10 @@ npx playwright install chromium
 npm run test:ui
 ```
 
-It covers mocked device setup, adding/revealing/searching accounts, encrypted export and restore, wrong-password rejection, locking/unlocking, import, navigation, mobile overflow, offline reload, offline QR-image decoding without BarcodeDetector, and unrelated-QR rejection. No mock credentials are included in the application bundle.
+It covers mocked device setup, adding/revealing/searching accounts, encrypted export and restore, wrong-password rejection, locking/unlocking, import, navigation, mobile overflow, offline reload, offline QR-image decoding without BarcodeDetector, unrelated-QR rejection, the installable manifest, the contents of the offline cache, and offline deep links. No mock credentials are included in the application bundle.
 
 ## Bundled dependencies
 
 The production QR decoder is [jsQR](https://github.com/cozmo/jsQR), licensed under Apache-2.0. Its code is bundled locally at build time, never fetched from a CDN. `qrcode` is a development-only dependency used to generate QR fixtures for browser tests.
+
+The app icons in `public/icons` are generated from the favicon mark by `npm run icons` (`scripts/icons.mjs`, no image dependency — it rasterises the mark and writes PNGs with Node's zlib). They are committed, and the offline tests fail if one of them drifts from the generator.

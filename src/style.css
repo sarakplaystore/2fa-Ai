@@ -295,11 +295,20 @@ header {
   gap: 7px;
   white-space: nowrap;
 }
-.local-pill > span {
+.local-pill > .pill-dot {
   width: 5px;
   height: 5px;
   border-radius: 50%;
   background: #80a795;
+  flex: none;
+}
+/* Offline is the normal state for this app: the pill says so calmly, and the
+   dot turns amber rather than red. */
+.local-pill.offline {
+  color: #9a7a4a;
+}
+.local-pill.offline > .pill-dot {
+  background: #cfa269;
 }
 .lock-button {
   border: 1px solid #e8e8ef;
@@ -1063,6 +1072,14 @@ footer .icon {
 .setting-value .icon {
   width: 14px;
   height: 14px;
+}
+/* The offline row explains what is cached in a sentence, not a label, and the
+   install hint is long: both wrap instead of pushing the page sideways. */
+.offline-card .setting-value {
+  white-space: normal;
+  text-align: left;
+  line-height: 1.7;
+  max-width: 300px;
 }
 .danger-zone p {
   margin-bottom: 20px;
