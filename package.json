@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build && node scripts/service-worker.js",
+    "build:android": "node scripts/build-android.mjs",
     "preview": "vite preview --host 0.0.0.0",
     "preview:vercel": "node scripts/vercel-preview.mjs",
     "icons": "node scripts/icons.mjs",

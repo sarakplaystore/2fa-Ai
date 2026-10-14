@@ -1,5 +1,10 @@
 import { readQrImage } from "./qr.js";
+import { createAndroidBridge } from "./android.js";
 import "./style.css";
+const androidMode = import.meta.env.VITE_ANDROID === "1";
+const android = androidMode
+  ? createAndroidBridge(window.StillAndroid, window)
+  : null;
 import {
   bytes,
   b64,
@@ -68,9 +73,11 @@ const app = document.querySelector("#app");
 const swSupported = () =>
   "serviceWorker" in navigator && window.isSecureContext;
 const installed = () =>
+  androidMode ||
   window.matchMedia?.("(display-mode: standalone)").matches ||
   window.navigator.standalone === true;
 function offlineStatus() {
+  if (androidMode) return "Bundled in APK — ready offline";
   if (import.meta.env.DEV) return "Not cached in development builds";
   if (!("serviceWorker" in navigator)) return "Unavailable in this browser";
   if (!window.isSecureContext) return "Needs HTTPS or localhost";
@@ -79,18 +86,24 @@ function offlineStatus() {
     : "Preparing the offline copy…";
 }
 function pill() {
-  const online = navigator.onLine;
+  const online = !androidMode && navigator.onLine;
   return `<span class="local-pill${online ? "" : " offline"}" title="${
-    online
-      ? "Nothing is sent to a server"
-      : "Offline — your codes, imports and backups still work"
+    androidMode
+      ? "Bundled locally — this app has no internet permission"
+      : online
+        ? "Nothing is sent to a server"
+        : "Offline — your codes, imports and backups still work"
   }"><i class="pill-dot"></i><span class="pill-label">${
-    online ? "Local only" : "Offline — codes still work"
+    androidMode
+      ? "On device · offline"
+      : online
+        ? "Local only"
+        : "Offline — codes still work"
   }</span></span>`;
 }
 function installControl() {
   if (installed())
-    return `<span class="setting-value">${icon("check")} Installed</span>`;
+    return `<span class="setting-value">${icon("check")} ${androidMode ? "Installed Android app" : "Installed"}</span>`;
   if (installPrompt)
     return `<button class="button secondary" data-action="install">${icon("arrow")} Install Still</button>`;
   return `<span class="setting-value">Use your browser’s install or “Add to Home Screen” option</span>`;
@@ -98,6 +111,7 @@ function installControl() {
 // Repaints what depends on the connection or on offline readiness. An open
 // dialog is never wiped, so the header pill is updated in place instead.
 function paintStatus() {
+  if (androidMode) return;
   const badge = document.querySelector(".local-pill"),
     label = badge?.querySelector(".pill-label"),
     online = navigator.onLine;
@@ -124,7 +138,7 @@ function render() {
   if (unlocked()) updateCodes();
 }
 function accountsPage() {
-  return `<div class="page-heading"><div><div class="eyebrow">A LITTLE MORE PEACE OF MIND</div><h1>Your authenticator</h1><p>A safe, quiet home for your two-factor codes.</p></div><button class="button primary" data-action="add">${icon("plus")} Add account</button></div>${!unlocked() ? `<section class="welcome"><div class="welcome-copy"><span class="mini-label">${icon("shield")} PRIVATE BY DEFAULT</span><h2>Your codes.<br>Only yours<span>.</span></h2><p>All your accounts, protected on your device.<br>No syncing. No tracking. No looking over your shoulder.</p><button class="button primary" data-action="unlock">${icon("face")} ${vault ? "Unlock your vault" : "Set up your private vault"} ${icon("chevron")}</button><small>${icon("lock")} ${vault ? "Verify with your device to access your codes." : "Protected with your device’s built-in verification."}</small></div><div class="vault-art" aria-hidden="true"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="art-dot dot-one"></div><div class="art-dot dot-two"></div><div class="floating-pill">${icon("check")} Stays on your device</div><div class="vault-graphic"><div class="vault-inner">${icon("face")}</div><span class="vault-light"></span><div class="vault-lines"><i></i><i></i><i></i><i></i><i></i><i></i></div></div><div class="floating-lock">${icon("lock")}</div><div class="art-caption">A PRIVATE SPACE, JUST FOR YOU</div></div></section>` : `<section class="unlocked-banner"><span class="banner-icon">${icon("shield")}</span><div><strong>Your vault is unlocked</strong><p>Codes stay hidden until you reveal them. Your vault locks when you leave this tab.</p></div><span class="verified">${icon("check")} Device verified</span></section>`}<section class="accounts-section"><div class="section-heading"><h3>Your accounts <span>${unlocked() ? accounts.length : 0}</span></h3><div class="account-tools"><div class="search-box">${icon("search")}<input id="search" placeholder="Search accounts…" value="${esc(search)}" aria-label="Search accounts" ${!unlocked() ? "disabled" : ""}></div><button class="icon-button" data-action="privacy" title="Hide all codes" aria-label="Hide all codes">${icon("eye")}</button></div></div><div id="account-list">${accountList()}</div></section><div class="feature-grid"><div>${icon("face")}<h4>Your device. Your identity.</h4><p>Unlock with your device’s secure<br>biometric or PIN verification.</p></div><div>${icon("offline")}<h4>100% local storage</h4><p>Encrypted on this browser.<br>No servers holding your secrets.</p></div><div>${icon("arrow")}<h4>Bring your accounts along</h4><p>Import existing accounts and keep<br>an encrypted backup in your hands.</p></div></div><div class="bottom-tip">${icon("info")} <span>A little tip: keep an encrypted backup somewhere safe. Local means we can’t recover your vault.</span><button data-action="help">Learn more ${icon("chevron")}</button></div>`;
+  return `<div class="page-heading"><div><div class="eyebrow">A LITTLE MORE PEACE OF MIND</div><h1>Your authenticator</h1><p>A safe, quiet home for your two-factor codes.</p></div><button class="button primary" data-action="add">${icon("plus")} Add account</button></div>${!unlocked() ? `<section class="welcome"><div class="welcome-copy"><span class="mini-label">${icon("shield")} PRIVATE BY DEFAULT</span><h2>Your codes.<br>Only yours<span>.</span></h2><p>All your accounts, protected on your device.<br>No syncing. No tracking. No looking over your shoulder.</p><button class="button primary" data-action="unlock">${icon("face")} ${vault ? "Unlock your vault" : "Set up your private vault"} ${icon("chevron")}</button><small>${icon("lock")} ${vault ? "Verify with your device to access your codes." : "Protected with your device’s built-in verification."}</small></div><div class="vault-art" aria-hidden="true"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="art-dot dot-one"></div><div class="art-dot dot-two"></div><div class="floating-pill">${icon("check")} Stays on your device</div><div class="vault-graphic"><div class="vault-inner">${icon("face")}</div><span class="vault-light"></span><div class="vault-lines"><i></i><i></i><i></i><i></i><i></i><i></i></div></div><div class="floating-lock">${icon("lock")}</div><div class="art-caption">A PRIVATE SPACE, JUST FOR YOU</div></div></section>` : `<section class="unlocked-banner"><span class="banner-icon">${icon("shield")}</span><div><strong>Your vault is unlocked</strong><p>Codes stay hidden until you reveal them. Your vault locks when you leave ${androidMode ? "the app" : "this tab"}.</p></div><span class="verified">${icon("check")} Device verified</span></section>`}<section class="accounts-section"><div class="section-heading"><h3>Your accounts <span>${unlocked() ? accounts.length : 0}</span></h3><div class="account-tools"><div class="search-box">${icon("search")}<input id="search" placeholder="Search accounts…" value="${esc(search)}" aria-label="Search accounts" ${!unlocked() ? "disabled" : ""}></div><button class="icon-button" data-action="privacy" title="Hide all codes" aria-label="Hide all codes">${icon("eye")}</button></div></div><div id="account-list">${accountList()}</div></section><div class="feature-grid"><div>${icon("face")}<h4>Your device. Your identity.</h4><p>Unlock with your device’s secure<br>biometric or PIN verification.</p></div><div>${icon("offline")}<h4>100% local storage</h4><p>Encrypted ${androidMode ? "inside this app" : "on this browser"}.<br>No servers holding your secrets.</p></div><div>${icon("arrow")}<h4>Bring your accounts along</h4><p>Import existing accounts and keep<br>an encrypted backup in your hands.</p></div></div><div class="bottom-tip">${icon("info")} <span>A little tip: keep an encrypted backup somewhere safe. Local means we can’t recover your vault.</span><button data-action="help">Learn more ${icon("chevron")}</button></div>`;
 }
 function accountList() {
   if (!unlocked() || !accounts.length)
@@ -141,22 +155,30 @@ function securityPage() {
     [
       "lock",
       "Encrypted at rest",
-      "Your vault is encrypted using AES-256-GCM. The key comes from your device credential using WebAuthn PRF and HKDF. We never store a plaintext vault key.",
+      androidMode
+        ? "Your vault is encrypted with AES-256-GCM. A random device secret is wrapped by an Android Keystore key that requires device verification; HKDF derives the vault key. Neither key is stored in plaintext."
+        : "Your vault is encrypted using AES-256-GCM. The key comes from your device credential using WebAuthn PRF and HKDF. We never store a plaintext vault key.",
     ],
     [
       "face",
       "Device verification, not face storage",
-      "Still never takes a face photo. Your operating system verifies you with its available biometrics or PIN. We cannot enforce face-only authentication, and some passkey providers may sync credentials.",
+      androidMode
+        ? "Still never takes a face photo. Android verifies you with a strong biometric or device PIN. The Keystore key is local to this installation; keep an encrypted backup if you change devices."
+        : "Still never takes a face photo. Your operating system verifies you with its available biometrics or PIN. We cannot enforce face-only authentication, and some passkey providers may sync credentials.",
     ],
     [
       "offline",
       "No application network requests",
-      "No analytics, remote APIs, external fonts, or cloud account. After the first visit the app caches its own files, so Still opens and unlocks offline. Codes, imports and backups keep working with no connection; only the first visit needs one.",
+      androidMode
+        ? "The app's files are bundled in this APK. It requests no Android internet permission and blocks navigation outside its local origin. Opening, unlocking, importing and exporting work without a connection."
+        : "No analytics, remote APIs, external fonts, or cloud account. After the first visit the app caches its own files, so Still opens and unlocks offline. Codes, imports and backups keep working with no connection; only the first visit needs one.",
     ],
     [
       "eye",
       "Protection from nearby eyes",
-      "Codes are hidden by default. The vault locks when the tab is hidden, the window loses focus, or after two minutes of inactivity. Press Escape to lock instantly.",
+      androidMode
+        ? "Codes are hidden by default. The vault locks when the app loses focus or after two minutes of inactivity; screenshots of the app are blocked."
+        : "Codes are hidden by default. The vault locks when the tab is hidden, the window loses focus, or after two minutes of inactivity. Press Escape to lock instantly.",
     ],
     [
       "export",
@@ -166,7 +188,9 @@ function securityPage() {
     [
       "info",
       "Know the boundaries",
-      "A compromised device, malicious browser extension, or someone with your device PIN may still access your data. Software cannot protect against mind reading; these controls address observable digital risks.",
+      androidMode
+        ? "A compromised device, a malicious WebView implementation, or someone with your device PIN may still access your data. This app has not been independently security-audited."
+        : "A compromised device, malicious browser extension, or someone with your device PIN may still access your data. Software cannot protect against mind reading; these controls address observable digital risks.",
     ],
   ]
     .map(
@@ -176,7 +200,7 @@ function securityPage() {
     .join("")}</div>`;
 }
 function settingsPage() {
-  return `<div class="page-heading"><div><div class="eyebrow">YOUR SPACE, YOUR RULES</div><h1>Vault settings</h1><p>Simple defaults. Strong protection.</p></div></div><section class="settings-card"><h3>Privacy defaults</h3><div class="setting-row"><div><strong>Hide verification codes</strong><p>Reveal individual codes only when you need them.</p></div><span class="setting-value">Always on ${icon("check")}</span></div><div class="setting-row"><div><strong>Lock when you leave</strong><p>Moving to another tab or window locks your vault.</p></div><span class="setting-value">Always on ${icon("check")}</span></div><div class="setting-row"><div><strong>Inactivity lock</strong><p>Automatically clear the unlocked vault from memory.</p></div><span class="setting-value">2 minutes</span></div><div class="setting-row"><div><strong>Encrypted backup</strong><p>Back up before clearing browser data or moving devices.</p></div><button class="button secondary" data-action="export">${icon("export")} Export</button></div></section><section class="settings-card offline-card"><h3>Offline &amp; install</h3><div class="setting-row"><div><strong>Offline access</strong><p>After the first visit the app caches its own files, so Still opens, unlocks and shows your codes with no connection. Your vault, codes, and exported files are never cached.</p></div><span class="setting-value" data-offline-status>${offlineStatus()}</span></div><div class="setting-row"><div><strong>Connection</strong><p>${navigator.onLine ? "Online, but nothing is sent anywhere. Your vault never leaves this device." : "You are offline. Codes, imports and encrypted backups all still work."}</p></div><span class="setting-value" data-network-status>${navigator.onLine ? "Online" : "Offline"}</span></div><div class="setting-row"><div><strong>Install to this device</strong><p>Add Still to your home screen or desktop so it opens like an app — no address bar, and usable offline.</p></div>${installControl()}</div></section><section class="settings-card danger-zone"><h3>Delete local vault</h3><p>This permanently removes this browser’s encrypted vault. Your device credential is managed separately in your device settings.</p><button class="button danger" data-action="reset">Delete vault from this browser</button></section>`;
+  return `<div class="page-heading"><div><div class="eyebrow">YOUR SPACE, YOUR RULES</div><h1>Vault settings</h1><p>Simple defaults. Strong protection.</p></div></div><section class="settings-card"><h3>Privacy defaults</h3><div class="setting-row"><div><strong>Hide verification codes</strong><p>Reveal individual codes only when you need them.</p></div><span class="setting-value">Always on ${icon("check")}</span></div><div class="setting-row"><div><strong>Lock when you leave</strong><p>${androidMode ? "Leaving the app locks your vault." : "Moving to another tab or window locks your vault."}</p></div><span class="setting-value">Always on ${icon("check")}</span></div><div class="setting-row"><div><strong>Inactivity lock</strong><p>Automatically clear the unlocked vault from memory.</p></div><span class="setting-value">2 minutes</span></div><div class="setting-row"><div><strong>Encrypted backup</strong><p>Back up before clearing browser data or moving devices.</p></div><button class="button secondary" data-action="export">${icon("export")} Export</button></div></section><section class="settings-card offline-card"><h3>Offline &amp; install</h3><div class="setting-row"><div><strong>Offline access</strong><p>${androidMode ? "The app is bundled in the APK. No connection or prior visit is needed to open, unlock, import or export. The vault is stored encrypted in this app’s private storage." : "After the first visit the app caches its own files, so Still opens, unlocks and shows your codes with no connection. Your vault, codes, and exported files are never cached."}</p></div><span class="setting-value" data-offline-status>${offlineStatus()}</span></div><div class="setting-row"><div><strong>Connection</strong><p>${androidMode ? "This APK does not request internet access and blocks all non-app URLs." : navigator.onLine ? "Online, but nothing is sent anywhere. Your vault never leaves this device." : "You are offline. Codes, imports and encrypted backups all still work."}</p></div><span class="setting-value" data-network-status>${androidMode ? "No internet permission" : navigator.onLine ? "Online" : "Offline"}</span></div><div class="setting-row"><div><strong>Install to this device</strong><p>${androidMode ? "Already installed. This copy is independent of the website's vault; use an encrypted backup to transfer accounts." : "Add Still to your home screen or desktop so it opens like an app — no address bar, and usable offline."}</p></div>${installControl()}</div></section><section class="settings-card danger-zone"><h3>Delete local vault</h3><p>${androidMode ? "This removes this installation’s encrypted vault and Android Keystore key. Export a backup first." : "This permanently removes this browser’s encrypted vault. Your device credential is managed separately in your device settings."}</p><button class="button danger" data-action="reset">Delete local vault</button></section>`;
 }
 function bind() {
   document.querySelectorAll("[data-page]").forEach(
@@ -218,7 +242,8 @@ function bindCards() {
         try {
           const code = await totp(a);
           if (epoch !== codeEpoch || !key) return;
-          await navigator.clipboard.writeText(code);
+          if (androidMode) await android.copyCode(code);
+          else await navigator.clipboard.writeText(code);
           toast("Code copied. Your clipboard is not automatically cleared.");
         } catch {
           toast("Copy unavailable. Reveal the code instead.");
@@ -256,7 +281,7 @@ function action(a) {
   if (a === "help")
     return modal(
       "A backup is your safety net",
-      `<p class="modal-description">Your vault is tied to this browser origin and your device credential. Clearing browser data, losing the credential, or changing the site address can make it inaccessible.</p><div class="callout">After adding accounts, export an encrypted backup. Keep it on a trusted offline drive. You’ll need your backup password to restore it to a new vault.</div><p class="modal-description">Never share setup keys, QR codes, or backup passwords. If a device is lost, use recovery codes from each service.</p>`,
+      `<p class="modal-description">${androidMode ? "Your vault is tied to this Android installation and its Keystore key. Uninstalling, clearing app data, or losing your screen lock can make it inaccessible." : "Your vault is tied to this browser origin and your device credential. Clearing browser data, losing the credential, or changing the site address can make it inaccessible."}</p><div class="callout">After adding accounts, export an encrypted backup. Keep it on a trusted offline drive. You’ll need your backup password to restore it to a new vault.</div><p class="modal-description">Never share setup keys, QR codes, or backup passwords. If a device is lost, use recovery codes from each service.</p>`,
     );
   if (a === "privacy") {
     revealed.clear();
@@ -275,7 +300,7 @@ function unlockDialog(next) {
   if (unlocked()) return;
   modal(
     vault ? "Welcome back" : "A private vault starts here",
-    `<div class="modal-emblem">${icon("face")}</div><p class="modal-description">${vault ? "Verify with the device credential you used to create this vault." : "Register your device’s secure credential. Your face or fingerprint stays with your operating system, never with Still."}</p><div class="callout"><strong>A note about compatibility</strong><br>This requires a secure browser and an authenticator with WebAuthn PRF support. Your device may offer a fingerprint or PIN instead of face verification. There is no less-secure fallback.</div><button id="verify" class="button primary full">${icon("face")} ${vault ? "Verify & unlock" : "Register device & create vault"}</button><p class="fine-print">Keep this site address unchanged. Credentials are bound to this origin. If verification is blocked inside a preview, open the app in its own browser tab.</p>`,
+    `<div class="modal-emblem">${icon("face")}</div><p class="modal-description">${vault ? "Verify with the device credential you used to create this vault." : androidMode ? "Protect a local Android Keystore key with your device's screen lock. Your face or fingerprint stays with Android, never with Still." : "Register your device’s secure credential. Your face or fingerprint stays with your operating system, never with Still."}</p><div class="callout"><strong>A note about compatibility</strong><br>${androidMode ? "Requires Android 11 or later and a strong biometric or device PIN. There is no password-only or unprotected fallback." : "This requires a secure browser and an authenticator with WebAuthn PRF support. Your device may offer a fingerprint or PIN instead of face verification. There is no less-secure fallback."}</div><button id="verify" class="button primary full">${icon("face")} ${vault ? "Verify & unlock" : "Register device & create vault"}</button><p class="fine-print">${androidMode ? "This vault is bound to this app installation. Export a password-encrypted backup before changing devices or uninstalling." : "Keep this site address unchanged. Credentials are bound to this origin. If verification is blocked inside a preview, open the app in its own browser tab."}</p>`,
   );
   document.querySelector("#verify").onclick = async () => {
     const b = document.querySelector("#verify");
@@ -306,66 +331,90 @@ function unlockDialog(next) {
 }
 let verifying = false,
   selectingFile = false;
-async function authenticate() {
-  if (!window.isSecureContext || !window.PublicKeyCredential)
+async function deviceMaterial() {
+  if (!window.isSecureContext)
+    throw Error("Secure device verification requires a secure context.");
+  if (androidMode) {
+    // Android WebView does not have the website's WebAuthn RP ID. Never try to
+    // use (or silently downgrade) a web credential here: the APK has its own
+    // Keystore-backed secret and a separate, versioned vault.
+    const record = vault || {
+      version: 2,
+      credentialId: "android-keystore-v1",
+      salt: b64(bytes(32)),
+    };
+    if (
+      record.version !== 2 ||
+      record.credentialId !== "android-keystore-v1" ||
+      typeof record.salt !== "string" ||
+      unb64(record.salt).length !== 32
+    )
+      throw Error("This vault requires a different device credential. Restore an encrypted backup instead.");
+    return { record, material: await android.authenticate(!vault) };
+  }
+  if (!window.PublicKeyCredential)
     throw Error(
       "Secure device verification is unavailable in this browser. Use HTTPS and a supported browser.",
     );
+  let record = vault;
+  let credential;
+  if (!record) {
+    const salt = bytes(32);
+    credential = await navigator.credentials.create({
+      publicKey: {
+        challenge: bytes(32),
+        rp: { name: "Still Authenticator" },
+        user: {
+          id: bytes(32),
+          name: "still-local-vault",
+          displayName: "Still private vault",
+        },
+        pubKeyCredParams: [
+          { type: "public-key", alg: -7 },
+          { type: "public-key", alg: -257 },
+        ],
+        authenticatorSelection: {
+          authenticatorAttachment: "platform",
+          residentKey: "required",
+          userVerification: "required",
+        },
+        extensions: { prf: { eval: { first: salt } } },
+        timeout: 120000,
+      },
+    });
+    if (!credential) throw Error("No credential was created.");
+    record = {
+      version: 1,
+      credentialId: b64(credential.rawId),
+      salt: b64(salt),
+    };
+  }
+  let prf = credential?.getClientExtensionResults()?.prf?.results?.first;
+  if (!prf) {
+    const assertion = await navigator.credentials.get({
+      publicKey: {
+        challenge: bytes(32),
+        allowCredentials: [
+          { id: unb64(record.credentialId), type: "public-key" },
+        ],
+        userVerification: "required",
+        extensions: { prf: { eval: { first: unb64(record.salt) } } },
+        timeout: 120000,
+      },
+    });
+    prf = assertion?.getClientExtensionResults()?.prf?.results?.first;
+  }
+  if (!prf)
+    throw Error(
+      "This device credential does not support PRF encryption. No vault was unlocked or created. Use a PRF-capable browser and authenticator.",
+    );
+  return { record, material: prf };
+}
+async function authenticate() {
   verifying = true;
   try {
-    let record = vault;
-    let credential;
-    if (!record) {
-      const salt = bytes(32);
-      credential = await navigator.credentials.create({
-        publicKey: {
-          challenge: bytes(32),
-          rp: { name: "Still Authenticator" },
-          user: {
-            id: bytes(32),
-            name: "still-local-vault",
-            displayName: "Still private vault",
-          },
-          pubKeyCredParams: [
-            { type: "public-key", alg: -7 },
-            { type: "public-key", alg: -257 },
-          ],
-          authenticatorSelection: {
-            authenticatorAttachment: "platform",
-            residentKey: "required",
-            userVerification: "required",
-          },
-          extensions: { prf: { eval: { first: salt } } },
-          timeout: 120000,
-        },
-      });
-      if (!credential) throw Error("No credential was created.");
-      record = {
-        version: 1,
-        credentialId: b64(credential.rawId),
-        salt: b64(salt),
-      };
-    }
-    let prf = credential?.getClientExtensionResults()?.prf?.results?.first;
-    if (!prf) {
-      const assertion = await navigator.credentials.get({
-        publicKey: {
-          challenge: bytes(32),
-          allowCredentials: [
-            { id: unb64(record.credentialId), type: "public-key" },
-          ],
-          userVerification: "required",
-          extensions: { prf: { eval: { first: unb64(record.salt) } } },
-          timeout: 120000,
-        },
-      });
-      prf = assertion?.getClientExtensionResults()?.prf?.results?.first;
-    }
-    if (!prf)
-      throw Error(
-        "This device credential does not support PRF encryption. No vault was unlocked or created. Use a PRF-capable browser and authenticator.",
-      );
-    const candidate = await biometricKey(prf, unb64(record.salt));
+    const { record, material } = await deviceMaterial();
+    const candidate = await biometricKey(material, unb64(record.salt));
     let data = vault ? await decrypt(candidate, record.sealed) : [];
     if (!Array.isArray(data)) throw Error("Invalid vault.");
     data = data.map(validateAccount);
@@ -562,16 +611,27 @@ function exportDialog() {
         salt: b64(salt),
         ...sealed,
       };
-      const url = URL.createObjectURL(
-        new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }),
-      );
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `still-backup-${new Date().toISOString().slice(0, 10)}.json`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      document.querySelector("#modal").close();
-      toast("Encrypted backup downloaded. Keep it somewhere safe.");
+      const filename = `still-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      if (androidMode) {
+        selectingFile = true; // Android's system document picker may take focus.
+        try {
+          await android.saveBackup(filename, JSON.stringify(data, null, 2));
+        } finally {
+          selectingFile = false;
+        }
+      } else {
+        const url = URL.createObjectURL(
+          new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }),
+        );
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+      if (document.querySelector("#modal")?.open)
+        document.querySelector("#modal").close();
+      toast(androidMode ? "Encrypted backup saved. Keep it somewhere safe." : "Encrypted backup downloaded. Keep it somewhere safe.");
     } catch (e) {
       error(e);
       b.disabled = false;
@@ -600,13 +660,18 @@ function resetDialog() {
     "Delete this local vault?",
     `<p class="modal-description">This cannot be undone. Export a backup first. Type DELETE to confirm.</p><form id="reset-form"><label>Confirmation<input name="confirmation" required autocomplete="off" pattern="DELETE"></label><button class="button danger full">Permanently delete vault</button></form>`,
   );
-  document.querySelector("#reset-form").onsubmit = (e) => {
+  document.querySelector("#reset-form").onsubmit = async (e) => {
     e.preventDefault();
     if (new FormData(e.target).get("confirmation") !== "DELETE") return;
-    localStorage.removeItem(STORAGE);
-    vault = null;
-    lock();
-    toast("Local vault deleted.");
+    try {
+      if (androidMode) await android.clearKey();
+      localStorage.removeItem(STORAGE);
+      vault = null;
+      lock();
+      toast("Local vault deleted.");
+    } catch (e) {
+      error(e);
+    }
   };
 }
 async function updateCodes() {
@@ -629,7 +694,10 @@ async function updateCodes() {
   }
 }
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden && !verifying) lock();
+  if (document.hidden && !verifying && !selectingFile) lock();
+});
+document.addEventListener("still-app-paused", () => {
+  if (!verifying && !selectingFile) lock();
 });
 window.addEventListener("blur", () => {
   if (!verifying && !selectingFile) lock();
@@ -676,7 +744,7 @@ window.addEventListener("appinstalled", () => {
   paintStatus();
   toast("Still was installed. It opens offline from now on.");
 });
-if (import.meta.env.PROD && swSupported()) {
+if (import.meta.env.PROD && !androidMode && swSupported()) {
   navigator.serviceWorker.addEventListener("controllerchange", () => {
     offlineReady = true;
     paintStatus();

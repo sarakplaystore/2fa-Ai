@@ -1,4 +1,13 @@
 node_modules/
 dist/
+android/.gradle/
+android/build/
+android/app/build/
+android/app/src/main/assets/www/
+local.properties
+*.apk
+*.aab
+*.jks
+*.keystore
 *.log
 .DS_Store
