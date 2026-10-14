@@ -1,3 +1,7 @@
 # Not part of the production build or of the deployed site.
 test/
 scripts/check-ui.mjs
+# Android-only sources and the requested debug APK aren't website assets.
+android/
+apk/
+scripts/build-android.mjs

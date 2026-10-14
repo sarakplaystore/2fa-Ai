@@ -76,8 +76,12 @@ test("APK web bundle contains local assets and native unlock, not WebAuthn or a 
   assert.match(script, /StillAndroid/);
   assert.doesNotMatch(script, /PublicKeyCredential|\/sw\.js|serviceWorker\.register/);
   assert.ok(!readdirSync(output).includes("sw.js"));
-  assert.match(read("android/app/src/main/AndroidManifest.xml"), /android:allowBackup="false"/);
-  assert.doesNotMatch(read("android/app/src/main/AndroidManifest.xml"), /<uses-permission/);
+  const manifest = read("android/app/src/main/AndroidManifest.xml");
+  assert.match(manifest, /android:allowBackup="false"/);
+  assert.deepEqual(
+    [...manifest.matchAll(/<uses-permission android:name="([^"]+)"/g)].map((m) => m[1]),
+    ["android.permission.USE_BIOMETRIC"],
+  );
   const java = read("android/app/src/main/java/com/sarakplaystore/still/MainActivity.java");
   assert.match(java, /setUserAuthenticationParameters\(0,/);
   assert.match(java, /setUserAuthenticationRequired\(true\)/);

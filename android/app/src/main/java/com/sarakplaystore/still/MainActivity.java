@@ -6,16 +6,20 @@ import android.content.ClipboardManager;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
+import android.graphics.Insets;
 import android.hardware.biometrics.BiometricManager;
 import android.hardware.biometrics.BiometricPrompt;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
 import android.util.Base64;
 import android.view.View;
+import android.view.WindowInsets;
 import android.view.WindowManager;
+import android.widget.FrameLayout;
 import android.webkit.JavascriptInterface;
 import android.webkit.SslErrorHandler;
 import android.webkit.ValueCallback;
@@ -104,7 +108,21 @@ public final class MainActivity extends Activity {
         // frames and scripts from other origins; Java separately checks the
         // main-frame origin and never loads a remote URL or resource.
         web.addJavascriptInterface(new DeviceBridge(), "StillAndroid");
-        setContentView(web);
+        FrameLayout container = new FrameLayout(this);
+        container.setBackgroundColor(Color.rgb(246, 247, 249));
+        container.addView(web, new FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        if (Build.VERSION.SDK_INT >= 35) {
+            // Android 15+ enforces edge-to-edge for targetSdk 35: keep the
+            // authenticator's controls clear of status/nav bars and cutouts.
+            container.setOnApplyWindowInsetsListener((view, insets) -> {
+                Insets safe = insets.getInsets(WindowInsets.Type.systemBars()
+                    | WindowInsets.Type.displayCutout());
+                view.setPadding(safe.left, safe.top, safe.right, safe.bottom);
+                return insets;
+            });
+        }
+        setContentView(container);
         web.loadUrl(HOME);
     }
 
@@ -228,6 +246,7 @@ public final class MainActivity extends Activity {
                     .setKeySize(256)
                     .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
                     .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                    .setRandomizedEncryptionRequired(true)
                     .setUserAuthenticationRequired(true)
                     .setUserAuthenticationParameters(0,
                         KeyProperties.AUTH_BIOMETRIC_STRONG | KeyProperties.AUTH_DEVICE_CREDENTIAL)
