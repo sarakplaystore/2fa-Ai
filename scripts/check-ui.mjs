@@ -35,13 +35,53 @@ await page.addInitScript(() => {
     }),
   };
   Object.defineProperty(navigator.credentials, "create", {
-    value: async () => credential,
+    value: async () => {
+      if (window.__rejectVerification) throw new DOMException("Canceled", "NotAllowedError");
+      if (window.__holdVerification) await new Promise((resolve) => { window.__releaseVerification = resolve; });
+      return credential;
+    },
   });
   Object.defineProperty(navigator.credentials, "get", {
     value: async () => credential,
   });
 });
 await page.goto("http://localhost:4173");
+
+// Every primary destination stays labeled, reachable, and free of horizontal
+// overflow on phones, tablets, and desktop (including a short landscape view).
+for (const [width, height] of [[320, 640], [390, 844], [620, 800], [768, 1024], [850, 600], [1024, 768], [1440, 1050]]) {
+  await page.setViewportSize({ width, height });
+  for (const name of ["Security & privacy", "Settings", "Authenticator"]) {
+    await page.getByRole("navigation").getByRole("button", { name, exact: true }).click();
+    assert.equal(await page.locator('nav [aria-current="page"]').count(), 1);
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${name} overflows at ${width}px`);
+  }
+  await page.getByRole("button", { name: "Set up your private vault" }).click();
+  await page.getByRole("dialog", { name: "Complete Facial recognition to continue" }).waitFor();
+  const bounds = await page.locator("dialog").boundingBox();
+  assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width);
+  await page.getByRole("button", { name: "Not now", exact: true }).click();
+}
+// Canceling must not unlock or persist a vault after a late device response.
+await page.evaluate(() => { window.__holdVerification = true; });
+await page.getByRole("button", { name: "Set up your private vault" }).click();
+await page.getByRole("button", { name: "Register device & create vault" }).click();
+await page.waitForFunction(() => !!window.__releaseVerification);
+await page.getByRole("status").filter({ hasText: "Complete verification" }).waitFor();
+await page.getByRole("button", { name: "Not now", exact: true }).click();
+await page.evaluate(() => { window.__releaseVerification(); window.__holdVerification = false; });
+// WebCrypto finishes asynchronously; wait for the UI to accept a new request.
+await page.waitForTimeout(200);
+assert.equal(await page.evaluate(() => localStorage.getItem("still.vault.v1")), null);
+assert.equal(await page.getByRole("button", { name: "Lock vault", exact: true }).count(), 0);
+// A rejected OS prompt leaves the dialog usable and gives a retry action.
+await page.evaluate(() => { window.__rejectVerification = true; });
+await page.getByRole("button", { name: "Set up your private vault" }).click();
+await page.getByRole("button", { name: "Register device & create vault" }).click();
+await page.getByRole("alert").filter({ hasText: "Verification was canceled" }).waitFor();
+await page.getByRole("button", { name: "Try registration again" }).waitFor();
+await page.getByRole("button", { name: "Not now", exact: true }).click();
+await page.evaluate(() => { window.__rejectVerification = false; });
 
 await page.getByRole("button", { name: "Set up your private vault" }).click();
 await page
@@ -228,6 +268,6 @@ assert.ok(
 await page.getByRole("button", { name: "Authenticator", exact: false }).click();
 assert.deepEqual(errors, []);
 console.log(
-  "UI smoke passed: setup (mocked credential), add, reveal, search, encrypted backup restore/wrong-password rejection, lock/unlock, import, Escape lock, navigation, responsive layout, offline reload, offline QR decoding, unrelated-QR rejection, installable manifest, offline cache contents and offline deep links.",
+  "UI smoke passed: setup (mocked credential), add, reveal, search, encrypted backup restore/wrong-password rejection, lock/unlock, import, Escape lock, navigation, labeled responsive layouts (320–1440px), facial-recognition prompt, cancellation/late-response protection, rejected-verification retry, offline reload, offline QR decoding, unrelated-QR rejection, installable manifest, offline cache contents and offline deep links.",
 );
 await browser.close();
