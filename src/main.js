@@ -133,12 +133,20 @@ function installApp() {
   paintStatus();
 }
 function render() {
-  app.innerHTML = `<aside class="sidebar"><a class="brand" href="#" aria-label="Still home"><span class="brand-mark"><i></i><i></i><i></i></span>still<span class="brand-dot">.</span></a><div class="workspace"><span class="workspace-icon">${icon("lock")}</span><div>Personal vault<small>ON THIS DEVICE</small></div><span class="status-dot"></span></div><div class="nav-label">WORKSPACE</div><nav><button data-page="accounts" class="${page === "accounts" ? "active" : ""}">${icon("grid")}Authenticator<span class="nav-count">${unlocked() ? accounts.length : "—"}</span></button><button data-action="import">${icon("arrow")}Import accounts</button><button data-action="export">${icon("export")}Export backup</button><div class="nav-divider"></div><button data-page="security" class="${page === "security" ? "active" : ""}">${icon("shield")}Security & privacy</button><button data-page="settings" class="${page === "settings" ? "active" : ""}">${icon("gear")}Settings</button></nav><div class="sidebar-bottom"><div class="local-note"><span class="local-icon">${icon("offline")}</span><strong>Offline. By design.</strong><p>No accounts. No cloud.<br>Just you and your keys.</p><button data-page="security">Our privacy promise ${icon("chevron")}</button></div><div class="version"><span class="tiny-mark">|||</span> STILL AUTHENTICATOR <span>v1.0</span></div></div></aside><div class="shell"><header><div class="breadcrumb">Personal vault ${icon("chevron")} <span>${page === "accounts" ? "Authenticator" : page === "security" ? "Security & privacy" : "Settings"}</span></div><div class="header-right">${pill()}<button class="lock-button" data-action="${unlocked() ? "lock" : "unlock"}">${icon("lock")} ${unlocked() ? "Lock vault" : "Vault locked"}</button><span class="avatar">${icon("shield")}</span></div></header><main>${page === "accounts" ? accountsPage() : page === "security" ? securityPage() : settingsPage()}</main><footer><span>${icon("shield")} Your secrets never leave this device unless you export them.</span><span>Made for peace of mind <span class="footer-dot">✦</span></span></footer></div><div id="toast" role="status"></div><dialog id="modal"></dialog>`;
+  app.innerHTML = `<a class="skip-link" href="#main-content">Skip to content</a><aside class="sidebar"><a class="brand" href="#" aria-label="Still home"><span class="brand-mark"><i></i><i></i><i></i></span>still<span class="brand-dot">.</span></a><div class="workspace"><span class="workspace-icon">${icon("lock")}</span><div>Personal vault<small>ON THIS DEVICE</small></div><span class="status-dot"></span></div><div class="nav-label">WORKSPACE</div><nav aria-label="Main navigation"><button data-page="accounts" class="${page === "accounts" ? "active" : ""}">${icon("grid")}<span class="nav-text">Authenticator</span><span class="nav-count">${unlocked() ? accounts.length : "—"}</span></button><button data-action="import">${icon("arrow")}<span class="nav-text"><span class="nav-long">Import accounts</span><span class="nav-short">Import</span></span></button><button data-action="export">${icon("export")}<span class="nav-text"><span class="nav-long">Export backup</span><span class="nav-short">Backup</span></span></button><div class="nav-divider"></div><button data-page="security" class="${page === "security" ? "active" : ""}">${icon("shield")}<span class="nav-text"><span class="nav-long">Security & privacy</span><span class="nav-short">Security</span></span></button><button data-page="settings" class="${page === "settings" ? "active" : ""}">${icon("gear")}<span class="nav-text"><span class="nav-long">Settings</span><span class="nav-short">Settings</span></span></button></nav><div class="sidebar-bottom"><div class="local-note"><span class="local-icon">${icon("offline")}</span><strong>Offline. By design.</strong><p>No accounts. No cloud.<br>Just you and your keys.</p><button data-page="security">Our privacy promise ${icon("chevron")}</button></div><div class="version"><span class="tiny-mark">|||</span> STILL AUTHENTICATOR <span>v1.0</span></div></div></aside><div class="shell"><header><div class="breadcrumb">Personal vault ${icon("chevron")} <span>${page === "accounts" ? "Authenticator" : page === "security" ? "Security & privacy" : "Settings"}</span></div><div class="header-right">${pill()}<button class="lock-button" data-action="${unlocked() ? "lock" : "unlock"}">${icon("lock")} ${unlocked() ? "Lock vault" : "Vault locked"}</button><span class="avatar">${icon("shield")}</span></div></header><main id="main-content" tabindex="-1">${page === "accounts" ? accountsPage() : page === "security" ? securityPage() : settingsPage()}</main><footer><span>${icon("shield")} Your secrets never leave this device unless you export them.</span><span>Made for peace of mind <span class="footer-dot">✦</span></span></footer></div><div id="toast" role="status"></div><dialog id="modal"></dialog>`;
+  document.querySelectorAll("nav [data-page]").forEach((button) => {
+    if (button.dataset.page === page) button.setAttribute("aria-current", "page");
+  });
+  document.querySelectorAll("nav button").forEach((button) => {
+    button.setAttribute("aria-label", button.querySelector(".nav-long")?.textContent || button.querySelector(".nav-text").textContent);
+  });
+  const lockButton = document.querySelector(".lock-button");
+  lockButton.setAttribute("aria-label", unlocked() ? "Lock vault" : vault ? "Unlock vault" : "Set up vault");
   bind();
   if (unlocked()) updateCodes();
 }
 function accountsPage() {
-  return `<div class="page-heading"><div><div class="eyebrow">A LITTLE MORE PEACE OF MIND</div><h1>Your authenticator</h1><p>A safe, quiet home for your two-factor codes.</p></div><button class="button primary" data-action="add">${icon("plus")} Add account</button></div>${!unlocked() ? `<section class="welcome"><div class="welcome-copy"><span class="mini-label">${icon("shield")} PRIVATE BY DEFAULT</span><h2>Your codes.<br>Only yours<span>.</span></h2><p>All your accounts, protected on your device.<br>No syncing. No tracking. No looking over your shoulder.</p><button class="button primary" data-action="unlock">${icon("face")} ${vault ? "Unlock your vault" : "Set up your private vault"} ${icon("chevron")}</button><small>${icon("lock")} ${vault ? "Verify with your device to access your codes." : "Protected with your device’s built-in verification."}</small></div><div class="vault-art" aria-hidden="true"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="art-dot dot-one"></div><div class="art-dot dot-two"></div><div class="floating-pill">${icon("check")} Stays on your device</div><div class="vault-graphic"><div class="vault-inner">${icon("face")}</div><span class="vault-light"></span><div class="vault-lines"><i></i><i></i><i></i><i></i><i></i><i></i></div></div><div class="floating-lock">${icon("lock")}</div><div class="art-caption">A PRIVATE SPACE, JUST FOR YOU</div></div></section>` : `<section class="unlocked-banner"><span class="banner-icon">${icon("shield")}</span><div><strong>Your vault is unlocked</strong><p>Codes stay hidden until you reveal them. Your vault locks when you leave ${androidMode ? "the app" : "this tab"}.</p></div><span class="verified">${icon("check")} Device verified</span></section>`}<section class="accounts-section"><div class="section-heading"><h3>Your accounts <span>${unlocked() ? accounts.length : 0}</span></h3><div class="account-tools"><div class="search-box">${icon("search")}<input id="search" placeholder="Search accounts…" value="${esc(search)}" aria-label="Search accounts" ${!unlocked() ? "disabled" : ""}></div><button class="icon-button" data-action="privacy" title="Hide all codes" aria-label="Hide all codes">${icon("eye")}</button></div></div><div id="account-list">${accountList()}</div></section><div class="feature-grid"><div>${icon("face")}<h4>Your device. Your identity.</h4><p>Unlock with your device’s secure<br>biometric or PIN verification.</p></div><div>${icon("offline")}<h4>100% local storage</h4><p>Encrypted ${androidMode ? "inside this app" : "on this browser"}.<br>No servers holding your secrets.</p></div><div>${icon("arrow")}<h4>Bring your accounts along</h4><p>Import existing accounts and keep<br>an encrypted backup in your hands.</p></div></div><div class="bottom-tip">${icon("info")} <span>A little tip: keep an encrypted backup somewhere safe. Local means we can’t recover your vault.</span><button data-action="help">Learn more ${icon("chevron")}</button></div>`;
+  return `<div class="page-heading"><div><div class="eyebrow">A LITTLE MORE PEACE OF MIND</div><h1>Your authenticator</h1><p>A safe, quiet home for your two-factor codes.</p></div><button class="button primary" data-action="add">${icon("plus")} Add account</button></div>${!unlocked() ? `<section class="welcome"><div class="welcome-copy"><span class="mini-label">${icon("shield")} PRIVATE BY DEFAULT</span><h2>Your codes.<br>Only yours<span>.</span></h2><p>All your accounts, protected on your device.<br>No syncing. No tracking. No looking over your shoulder.</p><button class="button primary" data-action="unlock">${icon("face")} ${vault ? "Unlock your vault" : "Set up your private vault"} ${icon("chevron")}</button><small>${icon("lock")} ${vault ? "Verify with your device to access your codes." : "Protected with your device’s built-in verification."}</small></div><div class="vault-art" aria-hidden="true"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="art-dot dot-one"></div><div class="art-dot dot-two"></div><div class="floating-pill">${icon("check")} Stays on your device</div><div class="vault-graphic"><div class="vault-inner">${icon("face")}</div><span class="vault-light"></span><div class="vault-lines"><i></i><i></i><i></i><i></i><i></i><i></i></div></div><div class="floating-lock">${icon("lock")}</div><div class="art-caption">A PRIVATE SPACE, JUST FOR YOU</div></div></section>` : `<section class="unlocked-banner"><span class="banner-icon">${icon("shield")}</span><div><strong>Your vault is unlocked</strong><p>Codes stay hidden until you reveal them. Your vault locks when you leave ${androidMode ? "the app" : "this tab"}.</p></div><span class="verified">${icon("check")} Device verified</span></section>`}<section class="accounts-section"><div class="section-heading"><h3>Your accounts <span>${unlocked() ? accounts.length : 0}</span></h3><div class="account-tools"><div class="search-box">${icon("search")}<input id="search" placeholder="Search accounts…" value="${esc(search)}" aria-label="Search accounts" ${!unlocked() ? "disabled" : ""}></div><button class="icon-button" data-action="privacy" title="Hide all codes" aria-label="Hide all codes">${icon("eye")}</button></div></div><div id="account-list">${accountList()}</div></section><div class="feature-grid"><div>${icon("face")}<h4>Your device. Your identity.</h4><p>Unlock with your device’s secure <br>biometric or PIN verification.</p></div><div>${icon("offline")}<h4>100% local storage</h4><p>Encrypted ${androidMode ? "inside this app" : "on this browser"}. <br>No servers holding your secrets.</p></div><div>${icon("arrow")}<h4>Bring your accounts along</h4><p>Import existing accounts and keep <br>an encrypted backup in your hands.</p></div></div><div class="bottom-tip">${icon("info")} <span>A little tip: keep an encrypted backup somewhere safe. Local means we can’t recover your vault.</span><button data-action="help">Learn more ${icon("chevron")}</button></div>`;
 }
 function accountList() {
   if (!unlocked() || !accounts.length)
@@ -208,6 +216,8 @@ function bind() {
       (b.onclick = () => {
         page = b.dataset.page;
         render();
+        document.querySelector("main").focus({ preventScroll: true });
+        window.scrollTo({ top: 0, behavior: "instant" });
       }),
   );
   document
@@ -262,11 +272,17 @@ function toast(t) {
 }
 function modal(title, body) {
   const d = document.querySelector("#modal");
-  d.innerHTML = `<div class="modal-top"><h2>${title}</h2><button class="icon-button" id="close-modal" aria-label="Close">${icon("close")}</button></div>${body}<p id="form-error" class="form-error" role="alert"></p>`;
-  d.showModal();
+  d.innerHTML = `<div class="modal-top"><h2 id="modal-title">${title}</h2><button class="icon-button" id="close-modal" aria-label="Close">${icon("close")}</button></div>${body}<p id="form-error" class="form-error" role="alert"></p>`;
+  d.setAttribute("aria-labelledby", "modal-title");
+  if (d.querySelector(".modal-description")) {
+    d.querySelector(".modal-description").id = "modal-description";
+    d.setAttribute("aria-describedby", "modal-description");
+  } else d.removeAttribute("aria-describedby");
+  if (!d.open) d.showModal();
   document.querySelector("#close-modal").onclick = () => d.close();
   d.onclick = (e) => {
-    if (e.target === d) d.close();
+    const bounds = d.getBoundingClientRect();
+    if (e.target === d && (e.clientX < bounds.left || e.clientX > bounds.right || e.clientY < bounds.top || e.clientY > bounds.bottom)) d.close();
   };
   return d;
 }
@@ -298,16 +314,23 @@ function action(a) {
 }
 function unlockDialog(next) {
   if (unlocked()) return;
-  modal(
-    vault ? "Welcome back" : "A private vault starts here",
-    `<div class="modal-emblem">${icon("face")}</div><p class="modal-description">${vault ? "Verify with the device credential you used to create this vault." : androidMode ? "Protect a local Android Keystore key with your device's screen lock. Your face or fingerprint stays with Android, never with Still." : "Register your device’s secure credential. Your face or fingerprint stays with your operating system, never with Still."}</p><div class="callout"><strong>A note about compatibility</strong><br>${androidMode ? "Requires Android 11 or later and a strong biometric or device PIN. There is no password-only or unprotected fallback." : "This requires a secure browser and an authenticator with WebAuthn PRF support. Your device may offer a fingerprint or PIN instead of face verification. There is no less-secure fallback."}</div><button id="verify" class="button primary full">${icon("face")} ${vault ? "Verify & unlock" : "Register device & create vault"}</button><p class="fine-print">${androidMode ? "This vault is bound to this app installation. Export a password-encrypted backup before changing devices or uninstalling." : "Keep this site address unchanged. Credentials are bound to this origin. If verification is blocked inside a preview, open the app in its own browser tab."}</p>`,
+  const dialog = modal(
+    "Complete Facial recognition to continue",
+    `<div class="auth-progress" aria-label="Authentication steps"><span class="current">1 · Verify identity</span><span>2 · ${vault ? "Access vault" : "Create vault"}</span></div><div class="modal-emblem">${icon("face")}</div><p class="auth-context">${next === "add" ? "Verify to add an account" : next === "import" ? "Verify to import accounts" : next === "export" ? "Verify to export a backup" : vault ? "Unlock your private vault" : "Set up your private vault"}</p><p class="modal-description">Use facial recognition in your device’s secure prompt when available. Your device may offer a fingerprint or PIN instead; Still cannot require face-only verification.</p><p class="modal-description">${vault ? "Verify with the device credential you used to create this vault." : androidMode ? "Protect a local Android Keystore key with your device's screen lock. Your face or fingerprint stays with Android, never with Still." : "Register your device’s secure credential. Your face or fingerprint stays with your operating system, never with Still."}</p><div class="callout"><strong>A note about compatibility</strong><br>${androidMode ? "Requires Android 11 or later and a strong biometric or device PIN. There is no password-only or unprotected fallback." : "This requires a secure browser and an authenticator with WebAuthn PRF support. Your device may offer a fingerprint or PIN instead of face verification. There is no less-secure fallback."}</div><button id="verify" class="button primary full">${icon("face")} ${vault ? "Verify & unlock" : "Register device & create vault"}</button><p id="verification-status" class="verification-status" role="status" aria-live="polite"></p><button id="cancel-verification" class="button secondary full">Not now</button><p class="fine-print">${androidMode ? "This vault is bound to this app installation. Export a password-encrypted backup before changing devices or uninstalling." : "Keep this site address unchanged. Credentials are bound to this origin. If verification is blocked inside a preview, open the app in its own browser tab."}</p>`,
   );
+  document.querySelector("#cancel-verification").onclick = () => dialog.close();
   document.querySelector("#verify").onclick = async () => {
     const b = document.querySelector("#verify");
+    const current = () => dialog.open && b.isConnected;
+    const status = document.querySelector("#verification-status");
+    document.querySelector("#form-error").textContent = "";
     b.disabled = true;
     b.textContent = "Waiting for your device…";
+    b.setAttribute("aria-busy", "true");
+    status.textContent = "Complete verification in your device’s secure prompt. You can cancel and try again.";
     try {
-      await authenticate();
+      await authenticate(current);
+      if (!current()) return;
       if (document.hidden) {
         lock();
         return;
@@ -317,6 +340,9 @@ function unlockDialog(next) {
       resetIdle();
       if (next) action(next);
     } catch (e) {
+      if (!current()) return;
+      status.textContent = "Verification did not finish. Your vault remains locked.";
+      b.removeAttribute("aria-busy");
       error(
         e.name === "NotAllowedError"
           ? Error(
@@ -410,7 +436,8 @@ async function deviceMaterial() {
     );
   return { record, material: prf };
 }
-async function authenticate() {
+async function authenticate(isCurrent = () => true) {
+  if (verifying) throw Error("Another verification is still finishing. Please try again shortly.");
   verifying = true;
   try {
     const { record, material } = await deviceMaterial();
@@ -420,8 +447,10 @@ async function authenticate() {
     data = data.map(validateAccount);
     if (!vault) {
       record.sealed = await encrypt(candidate, []);
+      if (!isCurrent()) return;
       localStorage.setItem(STORAGE, JSON.stringify(record));
     }
+    if (!isCurrent()) return;
     vault = record;
     key = candidate;
     accounts = data;

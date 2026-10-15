@@ -13,12 +13,19 @@ on:
       - 'src/**'
       - 'scripts/build-android.mjs'
   workflow_dispatch:
+    inputs:
+      update_apk:
+        description: 'Update the checked-in debug APK on an arena branch'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
   debug-apk:
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -47,3 +54,19 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
+
+      # Explicit opt-in only (manual input or [update-apk] commit marker).
+      # APK-only commits do not retrigger this workflow.
+      - name: Update downloadable APK
+        if: startsWith(github.ref, 'refs/heads/arena/') && ((github.event_name == 'workflow_dispatch' && inputs.update_apk) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[update-apk]')))
+        env:
+          BUILD_BRANCH: ${{ github.ref_name }}
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk apk/StillAuthenticator-debug.apk
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f apk/StillAuthenticator-debug.apk
+          if ! git diff --cached --quiet; then
+            git commit -m "Update bundled Android debug APK"
+            git push origin "HEAD:$BUILD_BRANCH"
+          fi
