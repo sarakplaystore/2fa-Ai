@@ -55,9 +55,10 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      # Explicit opt-in only. APK-only commits do not retrigger this workflow.
+      # Explicit opt-in only (manual input or [update-apk] commit marker).
+      # APK-only commits do not retrigger this workflow.
       - name: Update downloadable APK
-        if: github.event_name == 'workflow_dispatch' && inputs.update_apk && startsWith(github.ref, 'refs/heads/arena/')
+        if: startsWith(github.ref, 'refs/heads/arena/') && ((github.event_name == 'workflow_dispatch' && inputs.update_apk) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[update-apk]')))
         env:
           BUILD_BRANCH: ${{ github.ref_name }}
         run: |
